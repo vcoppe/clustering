@@ -44,11 +44,15 @@
 //! }
 //! 
 //! // actually perform the clustering
-//! let clustering = kmeans(k, &samples, max_iter);
+//! let clustering = kmeans(k, None, &samples, max_iter);
 //! 
 //! println!("membership: {:?}", clustering.membership);
 //! println!("centroids : {:?}", clustering.centroids);
 //! ```
+
+use std::time::{SystemTime, UNIX_EPOCH};
+
+use rand::{SeedableRng, rngs::StdRng, Rng};
 
 /// This is the trait you will want to implement for the types you wish to cluster.
 pub trait Elem {
@@ -76,8 +80,8 @@ pub struct Clustering<'a, T> {
 
 /// This function returns a clustering that groups the given set of 
 /// 'elems' in 'k' clusters and will at most perform 'iter' iterations before stopping
-pub fn kmeans<'a, T: Elem>(k: usize, elems: &[T], iter: usize) -> Clustering<T> {
-    let mut centroids = initialize(k, elems);
+pub fn kmeans<'a, T: Elem>(k: usize, seed: Option<u64>, elems: &[T], iter: usize) -> Clustering<T> {
+    let mut centroids = initialize(k, seed, elems);
     let mut membership = vec![0; elems.len()];
     let mut counts = vec![0; k];
 
@@ -157,11 +161,16 @@ fn square_distance(a: &dyn Elem, b: &dyn Elem) -> f64 {
 /// It returns a vector of centroids that are all equal to one of the vertices
 /// and all the centroids have greedily been chosen to be as far from one another
 /// as possibly can
-fn initialize<'a, T: Elem>(k: usize, elems: &'a [T]) -> Vec<Centroid> {
+fn initialize<'a, T: Elem>(k: usize, seed: Option<u64>, elems: &'a [T]) -> Vec<Centroid> {
     let mut taken = vec![false; elems.len()];
     let mut centroids = vec![];
 
-    let first = rand::random::<usize>() % elems.len();
+    let mut rng = match seed {
+        Some(seed) => StdRng::seed_from_u64(seed),
+        None => StdRng::seed_from_u64(SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs()),
+    };
+
+    let first = rng.gen::<usize>() % elems.len();
     taken[first] = true;
     centroids.push(new_centroid(&elems[first]));
 
@@ -288,7 +297,7 @@ mod test {
             &[30.9],
         ];
 
-        let clus = kmeans(3, &items, 1000);
+        let clus = kmeans(3, None, &items, 1000);
         println!("centroids  = {:?}", clus.membership);
         println!("membership = {:?}", clus.centroids);
     }
